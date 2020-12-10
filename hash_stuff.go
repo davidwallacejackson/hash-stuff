@@ -2,9 +2,9 @@ package hash_stuff
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/gobwas/glob"
 )
@@ -27,12 +27,14 @@ func (m multiError) Error() string {
 var _ error = multiError{}
 
 func listFiles(rootPath string, includePatterns []string, excludePatterns []string) ([]string, error) {
+	// normalize rootPath:
+	rootPath = strings.TrimSuffix(rootPath, "/")
+
 	globCompileErrors := []error{}
 
-	log.Println("Parsing include patterns")
 	includeGlobs := make([]glob.Glob, len(includePatterns))
 	for i, includePattern := range includePatterns {
-		compiled, err := glob.Compile(includePattern)
+		compiled, err := glob.Compile(includePattern, '/')
 		if err != nil {
 			globCompileErrors = append(globCompileErrors, err)
 		} else {
@@ -40,10 +42,9 @@ func listFiles(rootPath string, includePatterns []string, excludePatterns []stri
 		}
 	}
 
-	log.Println("Parsing exclude patterns")
 	excludeGlobs := make([]glob.Glob, len(excludePatterns))
 	for i, excludePattern := range excludePatterns {
-		compiled, err := glob.Compile(excludePattern)
+		compiled, err := glob.Compile(excludePattern, '/')
 		if err != nil {
 			globCompileErrors = append(globCompileErrors, err)
 		} else {
@@ -58,26 +59,26 @@ func listFiles(rootPath string, includePatterns []string, excludePatterns []stri
 		}
 	}
 
-	log.Printf("Walking root path %s", rootPath)
 	matchedFilePaths := []string{}
 	walkErrs := []error{}
 	walkFunc := func(path string, info os.FileInfo, err error) error {
+		pathWithoutPrefix := strings.TrimPrefix(path, rootPath+"/")
 		if err != nil {
 			// there was an error accessing this path -- log it and keep going so we can present all errors
 			walkErrs = append(walkErrs, err)
 			return nil
 		}
 
-		matchesInclude := matchesAny(path, includeGlobs)
-		matchesExclude := matchesAny(path, excludeGlobs)
+		matchesInclude := matchesAny(pathWithoutPrefix, includeGlobs)
+		matchesExclude := matchesAny(pathWithoutPrefix, excludeGlobs)
 
 		if info.IsDir() {
-			if matchesInclude && !matchesExclude {
-				// this is a directory we should be checking -- desceend into it and keep going
-				return nil
+			// recurse into all directories, unless they match an exclude
+			if matchesExclude {
+				return filepath.SkipDir
 			}
 
-			return filepath.SkipDir
+			return nil
 		}
 
 		if matchesInclude && !matchesExclude {

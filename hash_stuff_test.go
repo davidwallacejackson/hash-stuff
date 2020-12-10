@@ -17,20 +17,53 @@ func generateTmpDir() (string, []string, error) {
 		return "", nil, err
 	}
 
-	files, err := generateFiles(dirName)
+	rootFiles, err := generateFiles(dirName, "")
 	if err != nil {
 		return "", nil, err
 	}
 
+	fooDirName := filepath.Join(dirName, "foo")
+	if err := os.Mkdir(fooDirName, 0777); err != nil {
+		return "", nil, err
+	}
+
+	fooDirFiles, err := generateFiles(fooDirName, ".csv")
+	if err != nil {
+		return "", nil, err
+	}
+
+	// should have one with the extension elsewhere in the path
+	tsDirName := filepath.Join(dirName, "ts-files")
+	if err := os.Mkdir(tsDirName, 0777); err != nil {
+		return "", nil, err
+	}
+
+	tsDirFiles, err := generateFiles(tsDirName, ".ts")
+	if err != nil {
+		return "", nil, err
+	}
+
+	strayTsFileName := filepath.Join(dirName, "strayTsFile.ts")
+	if err := ioutil.WriteFile(strayTsFileName, []byte("content"), 0777); err != nil {
+		return "", nil, err
+	}
+
+	files := append(
+		rootFiles,
+		append(
+			fooDirFiles,
+			append(tsDirFiles, strayTsFileName)...)...)
+
+	sort.Strings(files)
 	return dirName, files, nil
 }
 
-func generateFiles(dirName string) ([]string, error) {
+func generateFiles(dirName string, extension string) ([]string, error) {
 	files := []string{}
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 10; i++ {
 		strI := strconv.Itoa(i)
-		path := filepath.Join(dirName, strI)
+		path := filepath.Join(dirName, strI+extension)
 		if err := ioutil.WriteFile(path, []byte("content"), 0777); err != nil {
 			return nil, err
 		}
@@ -38,7 +71,6 @@ func generateFiles(dirName string) ([]string, error) {
 		files = append(files, path)
 	}
 
-	sort.Strings(files)
 	return files, nil
 }
 
@@ -50,11 +82,57 @@ func TestListFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	foundFiles, err := listFiles(dirName, []string{"**"}, []string{})
-	if err != nil {
-		t.Fatal(err)
+	var expectList = func(message string, includePatterns []string, excludePatterns []string, expected []string) {
+		foundFiles, err := listFiles(dirName, includePatterns, excludePatterns)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(foundFiles, expected); diff != "" {
+			t.Fatal(message, diff)
+		}
 	}
-	if diff := cmp.Diff(foundFiles, actualFiles); diff != "" {
-		t.Fatal("listFiles output should contain all files in temp dir", diff)
-	}
+
+	expectList(
+		"listFiles output should contain all files in temp dir",
+		[]string{"**"},
+		[]string{},
+		actualFiles,
+	)
+
+	expectList(
+		"listFiles output should contain just the one ts file at the root",
+		[]string{"*.ts"},
+		[]string{},
+		[]string{filepath.Join(dirName, "strayTsFile.ts")},
+	)
+
+	expectList(
+		"listFiles should exclude files",
+		[]string{"*.ts"},
+		[]string{"*stray*"},
+		[]string{},
+	)
+
+	expectList(
+		"listFiles should not list files in subdirs without a **",
+		[]string{"*.csv"},
+		[]string{""},
+		[]string{},
+	)
+
+	expectList(
+		"listFiles should list files in subdirs and exclude files",
+		[]string{"**/*.csv"},
+		[]string{"**/*8.csv", "**/*7*"},
+		[]string{
+			filepath.Join(dirName, "foo/0.csv"),
+			filepath.Join(dirName, "foo/1.csv"),
+			filepath.Join(dirName, "foo/2.csv"),
+			filepath.Join(dirName, "foo/3.csv"),
+			filepath.Join(dirName, "foo/4.csv"),
+			filepath.Join(dirName, "foo/5.csv"),
+			filepath.Join(dirName, "foo/6.csv"),
+			filepath.Join(dirName, "foo/9.csv"),
+		},
+	)
 }
