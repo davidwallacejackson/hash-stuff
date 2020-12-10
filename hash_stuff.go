@@ -26,7 +26,7 @@ func (m multiError) Error() string {
 
 var _ error = multiError{}
 
-func listFiles(rootPath string, includePatterns []string, excludePatterns []string) ([]string, error) {
+func ListFiles(rootPath string, includePatterns []string, excludePatterns []string) ([]string, error) {
 	// normalize rootPath:
 	rootPath = strings.TrimSuffix(rootPath, "/")
 
