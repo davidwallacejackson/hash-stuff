@@ -2,6 +2,7 @@ package hash_stuff
 
 import (
 	"encoding/hex"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -81,6 +82,12 @@ func generateFiles(dirName string, extension string) ([]string, error) {
 	return files, nil
 }
 
+func updateFile(t *testing.T, path string, content string) {
+	if err := ioutil.WriteFile(path, []byte(content), 0777); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestListFiles(t *testing.T) {
 	dirName, actualFiles, err := generateTmpDir()
 	defer os.RemoveAll(dirName)
@@ -144,7 +151,7 @@ func TestListFiles(t *testing.T) {
 	)
 }
 
-func TestComputeHashes(t *testing.T) {
+func TestGetSummary(t *testing.T) {
 	dirName, actualFiles, err := generateTmpDir()
 	defer os.RemoveAll(dirName)
 
@@ -153,9 +160,7 @@ func TestComputeHashes(t *testing.T) {
 	}
 
 	changeFile := filepath.Join(dirName, "5")
-	if err := ioutil.WriteFile(changeFile, []byte("other content"), 0777); err != nil {
-		t.Fatal(err)
-	}
+	updateFile(t, changeFile, "other content")
 
 	fileHashes, err := ComputeHashes(actualFiles)
 	if err != nil {
@@ -170,10 +175,87 @@ func TestComputeHashes(t *testing.T) {
 
 		if !cmp.Equal(fileHash.hash, expectedMd5) {
 			t.Fatalf(
-				`Expected hash for %s to be "%s" but was "%x"`,
+				`expected hash for %s to be "%s" but was "%x"`,
 				fileHash.path,
 				expectedMd5,
 				fileHash.hash)
 		}
+	}
+
+	expectedSummary := ""
+	for _, fileHash := range fileHashes {
+		expectedMd5 := contentMd5
+		if fileHash.path == changeFile {
+			expectedMd5 = otherContentMd5
+		}
+
+		expectedSummary += fmt.Sprintf("%s: %x\n", fileHash.path, expectedMd5)
+	}
+
+	if diff := cmp.Diff(GetSummary(fileHashes), expectedSummary); diff != "" {
+		t.Fatal("wrong summary", diff)
+	}
+}
+
+func TestGetDigest(t *testing.T) {
+	dirName, _, err := generateTmpDir()
+	defer os.RemoveAll(dirName)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	startDigest, _, err := GetDigest([]string{dirName}, []string{"**"}, []string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	changeFile := filepath.Join(dirName, "5")
+	updateFile(t, changeFile, "other content")
+
+	afterChangeDigest, _, err := GetDigest([]string{dirName}, []string{"**"}, []string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(startDigest, afterChangeDigest); diff == "" {
+		t.Fatalf(`expected digest to be different after changing file but both were %s`, startDigest)
+	}
+
+	updateFile(t, changeFile, "content")
+
+	changedBackDigest, _, err := GetDigest([]string{dirName}, []string{"**"}, []string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(startDigest, changedBackDigest); diff != "" {
+		t.Fatal("expected digest to be the same as it was originally after changing file back", diff)
+	}
+}
+
+func TestGetDigestExcludeFile(t *testing.T) {
+	dirName, _, err := generateTmpDir()
+	defer os.RemoveAll(dirName)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	startDigest, _, err := GetDigest([]string{dirName}, []string{"**"}, []string{"5"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	changeFile := filepath.Join(dirName, "5")
+	updateFile(t, changeFile, "other content")
+
+	afterChangeDigest, _, err := GetDigest([]string{dirName}, []string{"**"}, []string{"5"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(startDigest, afterChangeDigest); diff != "" {
+		t.Fatal("expected digest to not change after changing excluded file", diff)
 	}
 }

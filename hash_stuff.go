@@ -3,8 +3,7 @@ package hash_stuff
 import (
 	"crypto/md5"
 	"fmt"
-	"io"
-	"log"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -183,16 +182,51 @@ func ComputeHashes(paths []string) ([]fileHash, error) {
 }
 
 func hashFile(path string) ([]byte, error) {
-	f, err := os.Open(path)
+	contents, err := ioutil.ReadFile(path)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	defer f.Close()
 
+	return hashString(string(contents))
+}
+
+func hashString(hashMe string) ([]byte, error) {
 	h := md5.New()
-	if _, err := io.Copy(h, f); err != nil {
-		log.Fatal(err)
+	_, err := h.Write([]byte(hashMe))
+	if err != nil {
+		return nil, err
 	}
 
 	return h.Sum(nil), nil
+}
+
+func GetSummary(fileHashes []fileHash) string {
+	summary := ""
+
+	for _, fileHash := range fileHashes {
+		summary += fmt.Sprintf("%s: %x\n", fileHash.path, fileHash.hash)
+	}
+
+	return summary
+}
+
+func GetDigest(rootPaths []string, includePatterns []string, excludePatterns []string) ([]byte, string, error) {
+	paths, err := ListFiles(rootPaths, includePatterns, excludePatterns)
+	if err != nil {
+		return nil, "", err
+	}
+
+	fileHashes, err := ComputeHashes(paths)
+	if err != nil {
+		return nil, "", err
+	}
+
+	summary := GetSummary(fileHashes)
+
+	digest, err := hashString(summary)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return digest, summary, nil
 }
