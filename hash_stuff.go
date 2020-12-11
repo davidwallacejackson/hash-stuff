@@ -1,11 +1,15 @@
 package hash_stuff
 
 import (
+	"crypto/md5"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/gobwas/glob"
 )
@@ -135,4 +139,60 @@ func matchesAny(path string, testGlobs []glob.Glob) bool {
 	}
 
 	return false
+}
+
+type fileHash struct {
+	path string
+	hash []byte
+}
+
+func ComputeHashes(paths []string) ([]fileHash, error) {
+	var wg sync.WaitGroup
+
+	fileHashes := make([]fileHash, len(paths))
+	var errs []error
+
+	for i, path := range paths {
+		wg.Add(1)
+		go func(i int, path string) {
+			hash, err := hashFile(path)
+			if err != nil {
+				// TODO: check if this is actually safe?
+				errs = append(errs, err)
+			} else {
+				fileHashes[i] = fileHash{
+					path: path,
+					hash: hash,
+				}
+			}
+
+			wg.Done()
+		}(i, path)
+	}
+
+	wg.Wait()
+
+	if len(errs) > 0 {
+		return nil, multiError{
+			errorType: "problem computing hashes",
+			errs:      errs,
+		}
+	}
+
+	return fileHashes, nil
+}
+
+func hashFile(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+
+	h := md5.New()
+	if _, err := io.Copy(h, f); err != nil {
+		log.Fatal(err)
+	}
+
+	return h.Sum(nil), nil
 }

@@ -1,6 +1,7 @@
 package hash_stuff
 
 import (
+	"encoding/hex"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -12,10 +13,10 @@ import (
 )
 
 // hash of the string "content"
-var contentMd5 = "9a0364b9e99bb480dd25e1f0284c8555"
+var contentMd5, _ = hex.DecodeString("9a0364b9e99bb480dd25e1f0284c8555")
 
 // hash of the string "other content"
-var otherContentMd5 = "0c84751f0ca9c6886bb09f2dd1a66faa"
+var otherContentMd5, _ = hex.DecodeString("0c84751f0ca9c6886bb09f2dd1a66faa")
 
 func generateTmpDir() (string, []string, error) {
 	dirName, err := ioutil.TempDir("./tmp", "test-")
@@ -129,7 +130,7 @@ func TestListFiles(t *testing.T) {
 	expectList(
 		"listFiles should list files in subdirs and exclude files",
 		[]string{"**/*.csv"},
-		[]string{"**/*8.csv", "**/*7*"},
+		[]string{"**/*8.csv", "**/7.*"},
 		[]string{
 			filepath.Join(dirName, "foo/0.csv"),
 			filepath.Join(dirName, "foo/1.csv"),
@@ -141,4 +142,38 @@ func TestListFiles(t *testing.T) {
 			filepath.Join(dirName, "foo/9.csv"),
 		},
 	)
+}
+
+func TestComputeHashes(t *testing.T) {
+	dirName, actualFiles, err := generateTmpDir()
+	defer os.RemoveAll(dirName)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	changeFile := filepath.Join(dirName, "5")
+	if err := ioutil.WriteFile(changeFile, []byte("other content"), 0777); err != nil {
+		t.Fatal(err)
+	}
+
+	fileHashes, err := ComputeHashes(actualFiles)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, fileHash := range fileHashes {
+		expectedMd5 := contentMd5
+		if fileHash.path == changeFile {
+			expectedMd5 = otherContentMd5
+		}
+
+		if !cmp.Equal(fileHash.hash, expectedMd5) {
+			t.Fatalf(
+				`Expected hash for %s to be "%s" but was "%x"`,
+				fileHash.path,
+				expectedMd5,
+				fileHash.hash)
+		}
+	}
 }
