@@ -110,6 +110,11 @@ func listFilesInternal(rootPath string, includePatterns []string, excludePattern
 			return nil
 		}
 
+		if info.Mode()&os.ModeSymlink != 0 {
+			println(fmt.Sprintf("Skipping symlink: %s", path))
+			return nil
+		}
+
 		if matchesInclude && !matchesExclude {
 			matchedFilePaths = append(matchedFilePaths, path)
 		}
