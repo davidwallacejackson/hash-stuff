@@ -11,6 +11,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+// hash of the string "content"
+var contentMd5 = "9a0364b9e99bb480dd25e1f0284c8555"
+
+// hash of the string "other content"
+var otherContentMd5 = "0c84751f0ca9c6886bb09f2dd1a66faa"
+
 func generateTmpDir() (string, []string, error) {
 	dirName, err := ioutil.TempDir("./tmp", "test-")
 	if err != nil {
@@ -83,7 +89,7 @@ func TestListFiles(t *testing.T) {
 	}
 
 	var expectList = func(message string, includePatterns []string, excludePatterns []string, expected []string) {
-		foundFiles, err := listFiles(dirName, includePatterns, excludePatterns)
+		foundFiles, err := ListFiles([]string{dirName}, includePatterns, excludePatterns)
 		if err != nil {
 			t.Fatal(err)
 		}

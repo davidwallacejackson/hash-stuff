@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/gobwas/glob"
@@ -26,7 +27,32 @@ func (m multiError) Error() string {
 
 var _ error = multiError{}
 
-func ListFiles(rootPath string, includePatterns []string, excludePatterns []string) ([]string, error) {
+func ListFiles(rootPaths []string, includePatterns []string, excludePatterns []string) ([]string, error) {
+	var matchedFilePaths []string = []string{}
+	var rootPathErrors []error
+
+	for _, rootPath := range rootPaths {
+		matchedFilePathsForRootPath, err := listFilesInternal(rootPath, includePatterns, excludePatterns)
+		if err != nil {
+			rootPathErrors = append(rootPathErrors, err)
+		}
+
+		matchedFilePaths = append(matchedFilePaths, matchedFilePathsForRootPath...)
+	}
+
+	if len(rootPathErrors) > 0 {
+		return nil, multiError{
+			errorType: "error in one or more root paths",
+			errs:      rootPathErrors,
+		}
+	}
+
+	sort.Strings(matchedFilePaths)
+
+	return matchedFilePaths, nil
+}
+
+func listFilesInternal(rootPath string, includePatterns []string, excludePatterns []string) ([]string, error) {
 	// normalize rootPath:
 	rootPath = strings.TrimSuffix(rootPath, "/")
 
