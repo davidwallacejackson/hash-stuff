@@ -19,6 +19,7 @@ type hashStuffOpts struct {
 	ExcludePatterns []string `short:"e" long:"exclude" description:"globs to exclude (can be passed multiple times)"`
 	ShowSummary     bool     `long:"show-summary" description:"print a list of files with their individual hashes to stderr"`
 	WriteSummaryTo  string   `long:"write-summary-to" description:"write a list of files with their individual hashes to the given path"`
+	Parallelism     int      `short:"p" long:"parallelism" description:"number of files to open simultaneously (unlimited by default)"`
 	Positional      struct {
 		RootPaths []string `positional-arg-name:"path" required:"1"`
 	} `positional-args:"yes"`
@@ -53,6 +54,7 @@ The summary presented by the --show-summary and --write-summary-to options is wh
 		opts.Positional.RootPaths,
 		opts.IncludePatterns,
 		opts.ExcludePatterns,
+		opts.Parallelism,
 	)
 	if err != nil {
 		panic(err)
