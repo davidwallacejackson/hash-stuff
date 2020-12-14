@@ -13,9 +13,16 @@ import (
 	"github.com/gobwas/glob"
 )
 
+var stopSignal = "///🛑///"
+
 type multiError struct {
 	errorType string
 	errs      []error
+}
+
+type pathToProcess struct {
+	path  string
+	index int
 }
 
 func (m multiError) Error() string {
@@ -150,28 +157,64 @@ type fileHash struct {
 	hash []byte
 }
 
-func ComputeHashes(paths []string) ([]fileHash, error) {
+func ComputeHashes(paths []string, parallelism int) ([]fileHash, error) {
 	var wg sync.WaitGroup
 
+	if parallelism < 1 {
+		// the default: infinite parallelism
+		parallelism = len(paths)
+	}
+
+	pathsToProcess := make(chan pathToProcess, parallelism)
 	fileHashes := make([]fileHash, len(paths))
 	var errs []error
 
-	for i, path := range paths {
+	for range paths {
 		wg.Add(1)
-		go func(i int, path string) {
-			hash, err := hashFile(path)
-			if err != nil {
-				// TODO: check if this is actually safe?
-				errs = append(errs, err)
-			} else {
-				fileHashes[i] = fileHash{
-					path: path,
-					hash: hash,
-				}
-			}
+	}
 
-			wg.Done()
-		}(i, path)
+	go func() {
+		for i, path := range paths {
+			pathsToProcess <- pathToProcess{
+				path:  path,
+				index: i,
+			}
+		}
+
+		for i := 0; i < parallelism; i++ {
+			pathsToProcess <- pathToProcess{
+				path:  stopSignal,
+				index: -1,
+			}
+		}
+	}()
+
+	for i := 0; i < parallelism; i++ {
+		go func() {
+			for true {
+				pathToProcess := <-pathsToProcess
+				path := pathToProcess.path
+
+				if path == stopSignal {
+					return
+				}
+
+				index := pathToProcess.index
+
+				hash, err := hashFile(path)
+				if err != nil {
+					// TODO: check if this is actually safe?
+					errs = append(errs, err)
+				} else {
+					fileHashes[index] = fileHash{
+						path: path,
+						hash: hash,
+					}
+				}
+
+				wg.Done()
+			}
+		}()
 	}
 
 	wg.Wait()
@@ -215,13 +258,13 @@ func GetSummary(fileHashes []fileHash) string {
 	return summary
 }
 
-func GetDigest(rootPaths []string, includePatterns []string, excludePatterns []string) ([]byte, string, error) {
+func GetDigest(rootPaths []string, includePatterns []string, excludePatterns []string, parallelism int) ([]byte, string, error) {
 	paths, err := ListFiles(rootPaths, includePatterns, excludePatterns)
 	if err != nil {
 		return nil, "", err
 	}
 
-	fileHashes, err := ComputeHashes(paths)
+	fileHashes, err := ComputeHashes(paths, parallelism)
 	if err != nil {
 		return nil, "", err
 	}

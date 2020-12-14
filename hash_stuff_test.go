@@ -162,7 +162,7 @@ func TestGetSummary(t *testing.T) {
 	changeFile := filepath.Join(dirName, "5")
 	updateFile(t, changeFile, "other content")
 
-	fileHashes, err := ComputeHashes(actualFiles)
+	fileHashes, err := ComputeHashes(actualFiles, -1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +205,7 @@ func TestGetDigest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startDigest, _, err := GetDigest([]string{dirName}, []string{"**"}, []string{})
+	startDigest, _, err := GetDigest([]string{dirName}, []string{"**"}, []string{}, -1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +213,7 @@ func TestGetDigest(t *testing.T) {
 	changeFile := filepath.Join(dirName, "5")
 	updateFile(t, changeFile, "other content")
 
-	afterChangeDigest, _, err := GetDigest([]string{dirName}, []string{"**"}, []string{})
+	afterChangeDigest, _, err := GetDigest([]string{dirName}, []string{"**"}, []string{}, -1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,7 +224,7 @@ func TestGetDigest(t *testing.T) {
 
 	updateFile(t, changeFile, "content")
 
-	changedBackDigest, _, err := GetDigest([]string{dirName}, []string{"**"}, []string{})
+	changedBackDigest, _, err := GetDigest([]string{dirName}, []string{"**"}, []string{}, -1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +242,7 @@ func TestGetDigestExcludeFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startDigest, _, err := GetDigest([]string{dirName}, []string{"**"}, []string{"5"})
+	startDigest, _, err := GetDigest([]string{dirName}, []string{"**"}, []string{"5"}, -1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +250,7 @@ func TestGetDigestExcludeFile(t *testing.T) {
 	changeFile := filepath.Join(dirName, "5")
 	updateFile(t, changeFile, "other content")
 
-	afterChangeDigest, _, err := GetDigest([]string{dirName}, []string{"**"}, []string{"5"})
+	afterChangeDigest, _, err := GetDigest([]string{dirName}, []string{"**"}, []string{"5"}, -1)
 	if err != nil {
 		t.Fatal(err)
 	}
