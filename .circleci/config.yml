@@ -1,18 +1,37 @@
 version: 2.1
 
-jobs:
-  build:
+executors:
+  go:
     docker:
       - image: circleci/golang:1.15.6
     working_directory: /mnt/ramdisk
     environment:
       GOMODCACHE: /mnt/ramdisk/go_modules
       GOCACHE: /mnt/ramdisk/go_build_cache
+
+workflows:
+  main:
+    jobs:
+      - test
+      - release:
+          # Only run this job on git tag pushes
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*(-.*)*/
+
+jobs:
+  test:
+    executor: go
     steps:
       - checkout
       # - run: sudo apt install upx-ucl # add this back to use upx
       - run: go test
-      - run: goreleaser
+  release:
+    executor: go
+    steps:
+      - checkout
       - run: curl -sL https://git.io/goreleaser | bash
       - run: du -h dist/*
       - store_artifacts:
