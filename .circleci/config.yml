@@ -12,7 +12,10 @@ executors:
 workflows:
   main:
     jobs:
-      - test
+      - test:
+          filters:
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*(-.*)*/
       - release:
           # Only run this job on git tag pushes
           filters:
