@@ -10,10 +10,10 @@ jobs:
       GOCACHE: /mnt/ramdisk/go_build_cache
     steps:
       - checkout
-      - run: sudo apt install upx-ucl
+      # - run: sudo apt install upx-ucl # add this back to use upx
       - run: go test
-      - run: GOOS=linux go build -ldflags="-s -w" -o="./build/linux/hash-stuff" cmd/hash-stuff/main.go && upx --brute ./build/linux/hash-stuff
-      # - run: GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o="./build/darwin/hash-stuff" cmd/hash-stuff/main.go && upx --brute ./build/darwin/hash-stuff
-      - run: du -h build
+      - run: goreleaser
+      - run: curl -sL https://git.io/goreleaser | bash
+      - run: du -h dist/*
       - store_artifacts:
-          path: ./build
+          path: ./dist
